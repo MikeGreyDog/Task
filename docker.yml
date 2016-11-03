@@ -1,0 +1,69 @@
+    - name: Add EPEL repository
+      yum: name=epel-release state=latest
+
+    - name: Upgrade packages
+      yum: name=* state=latest
+
+    - name: Remove firewalld package
+      yum: name=firewalld state=absent
+
+    - name: Add docker repository
+      yum_repository:
+        name: docker
+        description: Docker Repository
+        baseurl: https://yum.dockerproject.org/repo/main/centos/7/
+        enabled: yes
+        gpgcheck: yes
+        gpgkey: https://yum.dockerproject.org/gpg
+
+    - name: Install docker-engine
+      yum: name=docker-engine state=latest
+
+    - name: Check if filedocker.service exeists
+      stat: path=/usr/lib/systemd/system/docker.service
+      register: docker_file_stat
+
+    - name: Update docker startup settings
+      replace: dest=/usr/lib/systemd/system/docker.service regexp='^ExecStart=.*' replace='ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix:///run/docker.sock --cluster-store=consul://{{ inventory_hostname }}:8500 '
+      when: docker_file_stat.stat.exists
+      
+
+    - name: Check Docker version
+      shell: docker --version
+      register: docker_version
+    - debug: msg="{{ docker_version.stdout }}"
+
+    - name: Install python-pip
+      yum: name=python-pip state=latest
+
+    - name: Upgrade pip
+      pip: name=pip state=latest
+
+    - name: Install library 'docker-py'
+      pip: name=docker-py state=latest
+#  shell: pip install docker-py==1.7.0
+
+    - name: Install docker-compose
+      pip: name=docker-compose state=latest
+      
+#    - name: Restart docker
+#      shell: systemctl restart docker          
+
+    - name: Download Tomcat image
+      shell: docker pull tomcat
+
+    - name: Copy docker-compose package
+      copy: src=Docker.zip
+            dest=/home/MikeAzure   
+            owner=MikeAzure
+            mode=0644
+
+    - name: Unzip package
+      unarchive: src=/home/MikeAzure/Docker.zip
+                 dest=/home/MikeAzure
+                 copy=no
+      tags:
+        - unzip
+    
+    - name: Run cluster
+      shell: cd /home/MikeAzure/docker && docker-compose up -d 
